@@ -14,7 +14,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
-$Repo = 'anhtrinh2905/fairterms'
+$Repo = 'anhtrinh2905/fairterms-contract-analyst'
 
 function Set-GhSecret($Name, $Value) {
     if ($env:GITHUB_TOKEN) {
@@ -49,7 +49,7 @@ Set-GhSecret 'MAIN_ENV_FILE' $mainEnv
 
 if ($EnvOnly) {
     Write-Host ''
-    Write-Host 'Env secrets updated for anhtrinh2905/fairterms'
+    Write-Host 'Env secrets updated for anhtrinh2905/fairterms-contract-analyst'
     exit 0
 }
 
@@ -57,18 +57,10 @@ $sshKeyPath = Join-Path $Root 'deploy\ssh\fairterms-deploy'
 if (-not (Test-Path $sshKeyPath)) { throw "Missing SSH key: $sshKeyPath" }
 $sshKey = Get-Content $sshKeyPath -Raw
 
-Set-GhSecret 'SSH_HOST' '35.198.241.72'
-Set-GhSecret 'SSH_USER' 'fairterms-deploy'
+Set-GhSecret 'SSH_HOST' '52.77.14.171'
+Set-GhSecret 'SSH_USER' 'ubuntu'
 Set-GhSecret 'SSH_PRIVATE_KEY' $sshKey
-Set-GhSecret 'DOCKERHUB_USERNAME' 'anhquan0903'
-
-$dockerToken = $env:DOCKERHUB_TOKEN
-if (-not $dockerToken) {
-    $dockerToken = Read-Host 'Docker Hub access token (DOCKERHUB_TOKEN, Enter to skip)'
-}
-if ($dockerToken) {
-    Set-GhSecret 'DOCKERHUB_TOKEN' $dockerToken
-}
+# Images push to GHCR using the built-in GITHUB_TOKEN — no Docker Hub secret needed.
 
 Write-Host ''
-Write-Host 'All secrets set for anhtrinh2905/fairterms'
+Write-Host 'All secrets set for anhtrinh2905/fairterms-contract-analyst'

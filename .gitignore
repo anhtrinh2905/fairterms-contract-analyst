@@ -2,6 +2,7 @@
 .env
 deploy/.env.dev
 deploy/.env.main
+deploy/.env.db
 deploy/.env.deploy
 deploy/.env.tenten
 

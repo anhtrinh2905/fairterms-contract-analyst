@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time server bootstrap: nginx + certbot packages, enable site config.
-# Run on GCP VM: sudo bash ~/fairterms/deploy/setup-server.sh
+# Run on the AWS EC2 instance: sudo bash ~/fairterms/deploy/setup-server.sh
 set -euo pipefail
 
 DEPLOY_DIR="${DEPLOY_DIR:-/home/fairterms-deploy/fairterms/deploy}"

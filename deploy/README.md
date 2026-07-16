@@ -1,6 +1,6 @@
 # Deploy — FairTerms CI/CD
 
-Domain: **c2-app-145.io.vn** · Server: `35.198.241.72`
+Domain: **c2-app-145.io.vn** · Server (AWS EC2, ap-southeast-1): `52.77.14.171`
 
 ## Subdomains
 
@@ -11,34 +11,50 @@ Domain: **c2-app-145.io.vn** · Server: `35.198.241.72`
 | `c2-app-145.io.vn` | frontend main | 3001 |
 | `api.c2-app-145.io.vn` | backend main | 8001 |
 
-## PostgreSQL (Cloud SQL)
+## PostgreSQL (self-hosted, one container on the VM)
 
-Database: **`fairterms-db`** on GCP Cloud SQL (`contract-analysis-g145-vinuni:asia-southeast1:fairterms-db`).
+Postgres runs as a **single container on the same VM** as the app (no Cloud SQL),
+shared by both stacks with **two databases**: `fairterms_dev` and `fairterms_main`.
 
-VM deploy uses **Cloud SQL Auth Proxy** in Docker (same pattern as `docker-compose.local.yml`):
+Defined in **`docker-compose.db.yml`** — it owns the DB and exposes an external
+Docker network `fairterms-db-net` that both app stacks join. App containers reach
+it as host **`postgres:5432`** (the frontend entrypoint rewrites `127.0.0.1` → `postgres`).
+The port is **not** published to the host — the DB is reachable only from
+containers on `fairterms-db-net`.
 
-- `cloud-sql-proxy` service connects to Cloud SQL inside the Docker network.
-- `DATABASE_URL` in `.env.dev` / `.env.main` uses `127.0.0.1:5432` (same as local `.env`).
-- Frontend entrypoint rewrites the host to `cloud-sql-proxy` and runs `prisma migrate deploy` on startup.
-
-**VM service account:** grant **`roles/cloudsql.client`** on the VM’s attached service account (metadata auth — no JSON key file needed on the server).
+Start it **before** the app stacks:
 
 ```bash
-# Example (adjust SA email for your VM)
-gcloud projects add-iam-policy-binding contract-analysis-g145-vinuni \
-  --member="serviceAccount:YOUR_VM_SA@contract-analysis-g145-vinuni.iam.gserviceaccount.com" \
-  --role="roles/cloudsql.client"
+cd ~/fairterms/deploy
+cp .env.db.example .env.db   # set a strong POSTGRES_PASSWORD
+docker compose -f docker-compose.db.yml up -d
 ```
 
-## GCP firewall
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` in `.env.db` **must match** the
+  `user:password` embedded in `DATABASE_URL` of `.env.dev` (db `fairterms_dev`)
+  and `.env.main` (db `fairterms_main`).
+- Data persists in the `pgdata` Docker volume.
+- Cloud SQL is no longer used — you may **remove `roles/cloudsql.client`** from the
+  VM service account.
 
-Đã tạo rules (project `contract-analysis-g145-vinuni`):
+**Migrating existing Cloud SQL data (one-time):** after the DB container is up but
+before cutting the app over, run `bash deploy/migrate-cloudsql-to-local.sh`
+(configure `SRC_USER` / `SRC_PASSWORD` and the `DB_MAP` inside). Verify row counts
+before switching.
 
-- `fairterms-allow-http` — TCP 80 → tag `http-server`
-- `fairterms-allow-https` — TCP 443 → tag `https-server`
-- `fairterms-allow-frontend` — TCP 3000 (legacy)
+**Backups (replaces Cloud SQL automated backups):** schedule `deploy/backup-postgres.sh`
+via cron on the VM (example inside the script — daily `pg_dump` with retention).
 
-VM `fairterms-vm` đã có tags `http-server`, `https-server`.
+## AWS Security Group
+
+Security Group của EC2 instance chỉ cần 3 inbound rule:
+
+- **SSH** — TCP 22 → source **My IP** (không mở `0.0.0.0/0`)
+- **HTTP** — TCP 80 → source `0.0.0.0/0` (certbot + redirect 80→443)
+- **HTTPS** — TCP 443 → source `0.0.0.0/0`
+
+Các port ứng dụng (3000/3001, 8000/8001) **không** mở ra internet — nginx trên
+host reverse-proxy qua 443, các stack truy cập nội bộ qua Docker network.
 
 ## DNS
 
@@ -49,16 +65,21 @@ Cần **đổi NS tại Tenten** sang Google nameservers (hoặc thêm A records
 
 | Secret | Value |
 |--------|-------|
-| `SSH_HOST` | `35.198.241.72` |
+| `SSH_HOST` | `52.77.14.171` |
 | `SSH_USER` | `fairterms-deploy` |
 | `SSH_PRIVATE_KEY` | Contents of `deploy/ssh/fairterms-deploy` |
 | `DEV_ENV_FILE` | Full contents of `deploy/.env.dev` (see `.env.dev.example`) |
 | `MAIN_ENV_FILE` | Full contents of `deploy/.env.main` (see `.env.main.example`) |
+| `DB_ENV_FILE` | Full contents of `deploy/.env.db` (see `.env.db.example`) — `POSTGRES_USER`/`POSTGRES_PASSWORD` for the shared Postgres |
 
-**`DATABASE_URL` in secrets** — same format as local:
+**`DATABASE_URL` in secrets** — host stays `127.0.0.1` (entrypoint rewrites to
+`postgres`); use the per-stack database name and credentials matching `.env.db`:
 
 ```env
-DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/fairterms?schema=public
+# DEV_ENV_FILE
+DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/fairterms_dev?schema=public
+# MAIN_ENV_FILE
+DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/fairterms_main?schema=public
 ```
 
 Also set `NEXT_PUBLIC_BACKEND_URL` (not `NEXT_PUBLIC_API_URL`) to the public API URL for each stack.
@@ -74,7 +95,7 @@ push dev  → test → build *-dev images → push GHCR → SSH deploy → healt
 push main → test → build *-main images → push GHCR → SSH deploy → health check
 ```
 
-Deploy script starts `cloud-sql-proxy` before pulling app containers so migrations can reach the database.
+Deploy script starts the `docker-compose.db.yml` Postgres stack before pulling app containers so migrations can reach the database.
 
 **OCR uploads (PDF / multi-image):** nginx default `client_max_body_size` is 1m — too small for scanned contracts. API blocks in `nginx/fairterms.conf` use **55m** (backend `GEMINI_MAX_UPLOAD_MB=50`). After certbot rewrites the site to HTTPS, run once (or on every deploy via CI):
 
@@ -95,8 +116,7 @@ sudo bash ~/fairterms/deploy/setup-ssl.sh   # after DNS propagates
 
 ```bash
 cd ~/fairterms/deploy
-docker compose -f docker-compose.dev.yml up -d cloud-sql-proxy
-sleep 8
+docker compose -f docker-compose.db.yml up -d      # shared Postgres (idempotent)
 docker compose -f docker-compose.dev.yml pull
 docker compose -f docker-compose.dev.yml up -d
 ```

@@ -1,9 +1,10 @@
-# Build, tag, and push all 4 images to Docker Hub
+# Build, tag, and push all 4 images to GHCR (manual fallback; CI does this automatically).
+# Prerequisite: docker login ghcr.io -u anhtrinh2905  (use a GitHub PAT with write:packages)
 $ErrorActionPreference = "Stop"
 
 & (Join-Path $PSScriptRoot "build-images.ps1")
 
-$repo = "anhquan0903/fair_terms"
+$repo = "ghcr.io/anhtrinh2905/fairterms"
 $tags = @(
     @{ Local = "fairterms-backend:dev";  Remote = "backend-dev" },
     @{ Local = "fairterms-backend:main"; Remote = "backend-main" },
@@ -12,11 +13,11 @@ $tags = @(
 )
 
 foreach ($t in $tags) {
-    $remote = "${repo}:$($t.Remote)"
+    $remote = "${repo}/$($t.Remote)"
     Write-Host "==> Tag + push $remote"
     docker tag $t.Local $remote
     docker push $remote
 }
 
 Write-Host ""
-Write-Host "Pushed to https://hub.docker.com/r/anhquan0903/fair_terms"
+Write-Host "Pushed to https://github.com/anhtrinh2905?tab=packages&repo_name=fairterms"

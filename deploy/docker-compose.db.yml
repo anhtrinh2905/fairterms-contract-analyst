@@ -1,0 +1,53 @@
+# Shared self-hosted PostgreSQL — one container, two databases (dev + main)
+#
+# Replaces GCP Cloud SQL + cloud-sql-proxy. Runs on the SAME VM as the app to
+# save resources. dev and main are separate compose projects, so this stack owns
+# the DB and exposes it over an EXTERNAL Docker network (fairterms-db-net) that
+# both app stacks join. App containers reach it as host `postgres:5432`.
+#
+# Databases created on first init (see postgres-init/01-create-databases.sh):
+#   fairterms_dev   — used by docker-compose.dev.yml
+#   fairterms_main  — used by docker-compose.main.yml
+#
+# Usage (on the VM, BEFORE the app stacks):
+#   docker compose -f deploy/docker-compose.db.yml up -d
+#
+# The port is NOT published to the host — Postgres is reachable only from
+# containers on fairterms-db-net.
+
+name: fairterms-db
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # POSTGRES_USER / POSTGRES_PASSWORD come from .env.db and are injected into
+    # the container at runtime. They MUST match the credentials embedded in
+    # DATABASE_URL of both .env.dev and .env.main.
+    # NOTE: env_file values are NOT available for ${...} interpolation in this
+    # compose file — that is why they are not referenced in `environment:` or the
+    # healthcheck. The healthcheck reads $$POSTGRES_USER at runtime inside the
+    # container instead.
+    env_file:
+      - .env.db
+    environment:
+      # Default admin DB; the two app databases are created by the init script.
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - fairterms-db-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pgdata:
+
+networks:
+  fairterms-db-net:
+    name: fairterms-db-net

@@ -12,7 +12,6 @@ on:
 
 env:
   DOMAIN: c2-app-145.io.vn
-  DOCKER_REPO: anhquan0903/fair_terms
   DEPLOY_DIR: ~/fairterms/deploy
   COMPOSE_FILE: docker-compose.main.yml
   BACKEND_TAG: backend-main
@@ -86,7 +85,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: deploy/docker-compose.main.yml,deploy/nginx/fairterms.conf,deploy/patch-nginx-upload-limits.sh,deploy/setup-server.sh,deploy/setup-ssl.sh
+          source: deploy/docker-compose.main.yml,deploy/docker-compose.db.yml,deploy/postgres-init/01-create-databases.sh,deploy/backup-postgres.sh,deploy/migrate-cloudsql-to-local.sh,deploy/nginx/fairterms.conf,deploy/patch-nginx-upload-limits.sh,deploy/setup-server.sh,deploy/setup-ssl.sh
           target: ~/fairterms/deploy/
           strip_components: 1
 
@@ -94,23 +93,24 @@ jobs:
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           MAIN_ENV_FILE: ${{ secrets.MAIN_ENV_FILE }}
+          DB_ENV_FILE: ${{ secrets.DB_ENV_FILE }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 30m
-          envs: MAIN_ENV_FILE,GHCR_TOKEN
+          envs: MAIN_ENV_FILE,DB_ENV_FILE,GHCR_TOKEN
           script: |
             set -euo pipefail
             mkdir -p ${{ env.DEPLOY_DIR }}/nginx
             cd ${{ env.DEPLOY_DIR }}
             printf '%s\n' "$MAIN_ENV_FILE" > .env.main
+            printf '%s\n' "$DB_ENV_FILE" > .env.db
+            chmod +x postgres-init/*.sh backup-postgres.sh migrate-cloudsql-to-local.sh 2>/dev/null || true
             echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-            echo "==> Starting Cloud SQL Proxy..."
-            docker compose -f ${{ env.COMPOSE_FILE }} up -d cloud-sql-proxy
-            echo "==> Waiting for Cloud SQL Proxy..."
-            sleep 8
+            echo "==> Starting shared Postgres (docker-compose.db.yml)..."
+            docker compose -f docker-compose.db.yml up -d
             echo "==> Pulling backend..."
             docker compose -f ${{ env.COMPOSE_FILE }} pull backend
             echo "==> Pulling frontend..."
@@ -184,7 +184,7 @@ jobs:
               echo "==> Frontend not ready after 180s"
               docker compose -f ${{ env.COMPOSE_FILE }} ps || true
               docker compose -f ${{ env.COMPOSE_FILE }} logs frontend --tail 100 || true
-              docker compose -f ${{ env.COMPOSE_FILE }} logs cloud-sql-proxy --tail 50 || true
+              docker compose -f docker-compose.db.yml logs postgres --tail 50 || true
               exit 1
             fi
             curl -sfI "http://127.0.0.1:${FRONTEND_PORT}/" | head -1

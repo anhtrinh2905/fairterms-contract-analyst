@@ -1,4 +1,4 @@
-# Local development — hot reload + Cloud SQL Auth Proxy
+# Local development — hot reload + self-hosted Postgres (fully offline, no GCP)
 #
 # =============================================================================
 # ONE-TIME SETUP
@@ -6,28 +6,17 @@
 #
 # 1. Environment
 #      cp .env.example .env
-#    Fill API keys, AUTH_*, and DATABASE_URL (see step 3).
+#    Fill API keys, AUTH_*, and DATABASE_URL (see step 2).
 #
-# 2. Google Cloud (Cloud SQL Auth Proxy credentials)
-#      brew install google-cloud-sdk cloud-sql-proxy    # macOS
-#      gcloud auth application-default login
-#      gcloud config set project contract-analysis-g145-vinuni
+# 2. DATABASE_URL in repo root `.env`
+#    Point at the local `postgres` container. Use 127.0.0.1 — the frontend
+#    entrypoint rewrites the host to `postgres` inside the Docker network.
+#    Credentials must match POSTGRES_USER / POSTGRES_PASSWORD below
+#    (defaults: fairterms / fairterms). URL-encode special characters.
 #
-#    Optional — use a service account JSON instead of ADC:
-#      export GCP_ADC_FILE=/path/to/service-account.json
+#      DATABASE_URL="postgresql://fairterms:fairterms@127.0.0.1:5432/fairterms?schema=public"
 #
-# 3. DATABASE_URL in repo root `.env`
-#    Use localhost — proxy (native or Docker) terminates TLS to Cloud SQL.
-#    URL-encode special characters in the password (? → %3F, @ → %40).
-#
-#      DATABASE_URL="postgresql://USER:PASSWORD@127.0.0.1:5432/fairterms?schema=public"
-#
-#    No sslmode needed when connecting through the proxy.
-#    No GCP "Authorized networks" entry needed for your laptop IP.
-#
-# 4. First-time database schema
-#      cd src/frontend
-#      npx prisma migrate deploy
+#    Optional overrides in `.env`: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB.
 #
 # =============================================================================
 # OPTION A — Docker Compose (this file)
@@ -39,20 +28,16 @@
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:8010  (API docs: /docs)
 #
-# The `cloud-sql-proxy` service connects to:
-#   contract-analysis-g145-vinuni:asia-southeast1:fairterms-db
-# Frontend rewrites DATABASE_URL host 127.0.0.1 → cloud-sql-proxy inside Docker.
+# The `postgres` service stores data in the `pgdata` volume. The frontend
+# entrypoint waits for it, runs `prisma migrate deploy`, then starts dev server.
 #
 # =============================================================================
 # OPTION B — Native (no Docker)
 # =============================================================================
 #
-# Terminal 1 — Cloud SQL Proxy
-#   If port 5432 is busy (local Postgres), stop it first:
-#     brew services stop postgresql@16
-#   Or use another port (e.g. 5433) and set DATABASE_URL to 127.0.0.1:5433.
-#
-#     cloud-sql-proxy contract-analysis-g145-vinuni:asia-southeast1:fairterms-db --port 5432
+# Terminal 1 — Postgres
+#   Run just the DB container, or use a native install on 127.0.0.1:5432.
+#     docker compose -f deploy/docker-compose.local.yml up -d postgres
 #
 # Terminal 2 — Backend
 #     cd src/backend && uv sync --group dev
@@ -69,21 +54,23 @@
 name: fairterms-local
 
 services:
-  cloud-sql-proxy:
-    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.3
+  postgres:
+    image: postgres:16-alpine
     restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fairterms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fairterms}
+      POSTGRES_DB: ${POSTGRES_DB:-fairterms}
     ports:
       - "127.0.0.1:5432:5432"
-    command:
-      - ${CLOUD_SQL_INSTANCE:-contract-analysis-g145-vinuni:asia-southeast1:fairterms-db}
-      - --address=0.0.0.0
-      - --port=5432
-      - --credentials-file=/secrets/gcp-adc.json
     volumes:
-      - type: bind
-        source: ${GCP_ADC_FILE:-${APPDATA:-${HOME}/.config}/gcloud/application_default_credentials.json}
-        target: /secrets/gcp-adc.json
-        read_only: true
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fairterms}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
@@ -157,21 +144,22 @@ services:
       - -c
       - |
         set -e
-        export DATABASE_URL=$$(echo "$$DATABASE_URL" | sed -E -e 's/@(127\.0\.0\.1|localhost|172\.17\.0\.1):[0-9]+/@cloud-sql-proxy:5432/')
-        until nc -z cloud-sql-proxy 5432; do
-          echo "Waiting for Cloud SQL Proxy..."
+        export DATABASE_URL=$$(echo "$$DATABASE_URL" | sed -E -e 's/@(127\.0\.0\.1|localhost|172\.17\.0\.1):[0-9]+/@postgres:5432/')
+        until nc -z postgres 5432; do
+          echo "Waiting for Postgres..."
           sleep 2
         done
         npx prisma generate
         npx prisma migrate deploy
         exec npm run dev -- -H 0.0.0.0
     depends_on:
-      cloud-sql-proxy:
-        condition: service_started
+      postgres:
+        condition: service_healthy
       backend:
         condition: service_healthy
 
 volumes:
+  pgdata:
   chroma_data:
   backend_logs:
   frontend_node_modules:

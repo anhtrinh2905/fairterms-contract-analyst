@@ -2,8 +2,8 @@
 # Public key: deploy/ssh/fairterms-deploy.pub
 
 Host fairterms
-  HostName 35.198.241.72
-  User fairterms-deploy
+  HostName 52.77.14.171
+  User ubuntu
   Port 22
   IdentityFile deploy/ssh/fairterms-deploy
   IdentitiesOnly yes

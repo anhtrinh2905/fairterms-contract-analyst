@@ -52,7 +52,14 @@ RUN --mount=type=secret,id=embed_key \
 # user, so a compromise of the FastAPI process can't act as root in the
 # container. Created after the ingest step above so the build-time index write
 # still runs as root; chown hands the baked venv, app, and .chroma to `app`.
-RUN groupadd --system app \
+#
+# mkdir /app/logs BEFORE chown so the directory exists and is owned by `app`.
+# The logs-* named volume mounts here; Docker copies this dir's ownership into
+# an empty volume on first use, so the non-root process can write backend.log.
+# Without this, the volume mountpoint defaults to root and the app crashes with
+# PermissionError on /app/logs/backend.log.
+RUN mkdir -p /app/logs \
+    && groupadd --system app \
     && useradd --system --gid app --home-dir /app --shell /usr/sbin/nologin app \
     && chown -R app:app /app
 USER app

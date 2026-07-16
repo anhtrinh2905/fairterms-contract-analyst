@@ -1,0 +1,77 @@
+# VM deploy — pull pre-built images from GHCR (no hot reload)
+# Local development with hot reload: deploy/docker-compose.local.yml
+#
+# PostgreSQL: Cloud SQL Auth Proxy (same pattern as docker-compose.local.yml)
+# DATABASE_URL in .env.dev should use 127.0.0.1:5432 — frontend entrypoint rewrites
+# the host to cloud-sql-proxy inside the Docker network.
+#
+# GCP VM needs a service account with roles/cloudsql.client (metadata auth).
+# Optional: set GOOGLE_APPLICATION_CREDENTIALS in .env.dev to a JSON key path on the host.
+#
+# Same VM as main: host ports 8000/3000 (main uses 8001/3001)
+# Usage: docker compose -f deploy/docker-compose.dev.yml up -d
+
+name: fairterms-dev
+
+services:
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.3
+    restart: unless-stopped
+    command:
+      - ${CLOUD_SQL_INSTANCE:-contract-analysis-g145-vinuni:asia-southeast1:fairterms-db}
+      - --address=0.0.0.0
+      - --port=5432
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    image: ghcr.io/anhtrinh2905/fairterms/backend-dev
+    env_file:
+      - .env.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      # RAG index is baked into the image (see src/backend/Dockerfile). Do NOT
+      # mount a named volume over /app/.chroma — it would shadow the baked index
+      # with a stale/empty one and reintroduce the wrong-citation bug.
+      - logs-dev:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+
+  frontend:
+    image: ghcr.io/anhtrinh2905/fairterms/frontend-dev
+    env_file:
+      - .env.dev
+    environment:
+      # Internal backend URL for server-side fetches from frontend container.
+      # ADMIN_EMAILS / ADMIN_API_TOKEN come from env_file (.env.dev) — do not
+      # re-declare here: ${ADMIN_EMAILS:-} would interpolate from host/shell and
+      # override .env.dev with an empty value on the VM.
+      BACKEND_URL_INTERNAL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      cloud-sql-proxy:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  logs-dev:

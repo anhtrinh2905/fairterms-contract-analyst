@@ -1,0 +1,260 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  tier          String    @default("free")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+
+  // Custom relations
+  quota               UserQuota?
+  contractAnalyses    ContractAnalysis[]
+  clauseAnalyses      ClauseAnalysis[]
+  usageEvents         UsageEvent[]
+  analysisShares      AnalysisShare[]
+  contractComparisons ContractComparison[]
+  analysisFeedbacks   AnalysisFeedback[]
+}
+
+model AnalysisShare {
+  id           String    @id @default(cuid())
+  token        String    @unique
+  ownerId      String
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  analysisType String    @default("contract")
+  title        String?
+  snapshot     Json
+  viewCount    Int       @default(0)
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([ownerId, createdAt])
+}
+
+model UserQuota {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contractAnalysisCount Int      @default(0)
+  contractAnalysisLimit Int      @default(5)
+  clauseAnalysisCount   Int      @default(0)
+  clauseAnalysisLimit   Int      @default(10)
+  comparisonCount       Int      @default(0)
+  comparisonLimit       Int      @default(5)
+  periodStart           DateTime @default(now())
+  periodEnd             DateTime
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model ContractAnalysis {
+  id                   String               @id @default(cuid())
+  userId               String
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                String?
+  fileName             String
+  documentId           String?
+  contractType         String
+  overallRisk          String?
+  status               String               @default("processing")
+  contractInfo         Json?
+  ocrMarkdown          String?
+  structuredData       Json?
+  totalClauses         Int                  @default(0)
+  analyzedClauses      Int                  @default(0)
+  flaggedClauses       Int                  @default(0)
+  processingTimeMs     Float?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  expiresAt            DateTime
+  clauses              ClauseAnalysis[]
+  parties              ContractParty[]
+  equipment            ContractEquipment[]
+  comparisonsAsBase    ContractComparison[] @relation("ComparisonBase")
+  comparisonsAsRevised ContractComparison[] @relation("ComparisonRevised")
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model ContractComparison {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baseAnalysisId    String
+  baseAnalysis      ContractAnalysis @relation("ComparisonBase", fields: [baseAnalysisId], references: [id], onDelete: Cascade)
+  revisedAnalysisId String
+  revisedAnalysis   ContractAnalysis @relation("ComparisonRevised", fields: [revisedAnalysisId], references: [id], onDelete: Cascade)
+  diffResult        Json
+  overallVerdict    String
+  overallSummary    String
+  createdAt         DateTime         @default(now())
+  expiresAt         DateTime
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([baseAnalysisId])
+  @@index([revisedAnalysisId])
+  @@index([expiresAt])
+}
+
+model ClauseAnalysis {
+  id                 String            @id @default(cuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contractAnalysisId String?
+  contractAnalysis   ContractAnalysis? @relation(fields: [contractAnalysisId], references: [id], onDelete: Cascade)
+  source             String
+  clauseText         String
+  articleNo          String?
+  contractType       String
+  riskLevel          String?
+  conclusion         String?
+  analysisResult     Json?
+  legalBasis         Json?
+  suggestion         String?
+  negotiationMessage String?
+  processingTimeMs   Float?
+  expiresAt          DateTime
+  createdAt          DateTime          @default(now())
+
+  @@index([userId])
+  @@index([contractAnalysisId])
+  @@index([userId, source, createdAt])
+  @@index([source])
+  @@index([expiresAt])
+}
+
+model ContractParty {
+  id                 String           @id @default(cuid())
+  contractAnalysisId String
+  contractAnalysis   ContractAnalysis @relation(fields: [contractAnalysisId], references: [id], onDelete: Cascade)
+  side               String
+  roleLabel          String?
+  nameHash           String?
+  idNumberHash       String?
+  missingFields      Json?
+  createdAt          DateTime         @default(now())
+
+  @@index([contractAnalysisId])
+}
+
+model ContractEquipment {
+  id                 String           @id @default(cuid())
+  contractAnalysisId String
+  contractAnalysis   ContractAnalysis @relation(fields: [contractAnalysisId], references: [id], onDelete: Cascade)
+  name               String
+  quantity           Int              @default(1)
+  condition          String?
+  createdAt          DateTime         @default(now())
+
+  @@index([contractAnalysisId])
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model UsageEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action        String
+  resourceId    String?
+  ipHash        String?
+  userAgentHash String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([userId, action, createdAt])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminEmail String
+  action     String
+  target     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([adminEmail])
+  @@index([createdAt])
+}
+
+model AnalysisFeedback {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  analysisType String   // "clause" | "contract" | "compare"
+  analysisId   String   // ID of ContractAnalysis, ClauseAnalysis, or ContractComparison
+
+  rating       Int      // 1-5
+
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime // createdAt + 1 year, for cron cleanup
+
+  @@unique([userId, analysisType, analysisId])
+  @@index([analysisType])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+

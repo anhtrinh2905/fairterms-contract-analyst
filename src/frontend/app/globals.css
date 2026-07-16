@@ -1,0 +1,210 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* App toggles theme via data-theme on <html> (see FairTermsApp), not a .dark class. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ==========================================================================
+   FairTerms design tokens — source of truth: DESIGN.md
+   Do not hardcode hex in components; reference these tokens.
+   ========================================================================== */
+:root {
+  --radius: 0.75rem; /* 12px — matches the deep-tech app shell (fairterms.css) */
+
+  --background: #f6f9fc; /* canvas-soft page bg */
+  --foreground: #0d253d; /* deep-navy ink */
+  --card: #ffffff;
+  --card-foreground: #0d253d;
+  --popover: #ffffff;
+  --popover-foreground: #0d253d;
+
+  --primary: #533afd; /* Indigo CTA + brand */
+  --primary-foreground: #ffffff;
+  --secondary: #ecebff; /* pale indigo tint surface */
+  --secondary-foreground: #2e2b8c; /* indigo ink */
+
+  /* Subtle indigo tint — hover surfaces for ghost/outline items */
+  --accent: #ecebff;
+  --accent-foreground: #2e2b8c;
+
+  --muted: #eef3f9;
+  --muted-foreground: #475569;
+
+  --border: #e3e8ee;
+  --input: #cdd6e0;
+  --ring: #533afd;
+
+  --destructive: #d6294f; /* same ruby as risk-high; irreversible actions */
+  --destructive-foreground: #ffffff;
+
+  /* Risk semantics — always paired with icon + text (never color alone) */
+  --risk-high: #d6294f;
+  --risk-high-surface: #fce8ed;
+  --risk-high-border: #f4bcc8;
+  --risk-high-text: #a01838;
+  --risk-medium: #c2630e;
+  --risk-medium-surface: #fbeede;
+  --risk-medium-border: #f0cfa4;
+  --risk-medium-text: #8a4408;
+  --risk-low: #1f8a5b;
+  --risk-low-surface: #e1f3ea;
+  --risk-low-border: #b2e0c8;
+  --risk-low-text: #136040;
+
+  /* Data viz */
+  --chart-1: #533afd;
+  --chart-2: #8b83ff;
+  --chart-3: #22d3ee;
+  --chart-4: #1f8a5b;
+  --chart-5: #f1b24a;
+
+  /* Sidebar (shadcn sidebar primitive) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0d253d;
+  --sidebar-primary: #533afd;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ecebff;
+  --sidebar-accent-foreground: #2e2b8c;
+  --sidebar-border: #e3e8ee;
+  --sidebar-ring: #533afd;
+}
+
+[data-theme="dark"] {
+  --background: #0a1726; /* deep-navy app shell */
+  --foreground: #eaf0f7;
+  --card: #122236;
+  --card-foreground: #eaf0f7;
+  --popover: #122236;
+  --popover-foreground: #eaf0f7;
+
+  --primary: #8b83ff; /* lifted indigo, not inverted */
+  --primary-foreground: #0a1726;
+  --secondary: #1e2747;
+  --secondary-foreground: #c7c2ff;
+
+  --accent: #1e2747;
+  --accent-foreground: #c7c2ff;
+
+  --muted: #18304a;
+  --muted-foreground: #a6b6c9;
+
+  --border: #21364e;
+  --input: #2e4865;
+  --ring: #8b83ff;
+
+  --destructive: #f87171;
+  --destructive-foreground: #0a1726;
+
+  --risk-high: #f87171;
+  --risk-high-surface: color-mix(in srgb, #f87171 16%, var(--card));
+  --risk-high-border: color-mix(in srgb, #f87171 40%, var(--card));
+  --risk-high-text: #fca5a5;
+  --risk-medium: #fbbf24;
+  --risk-medium-surface: color-mix(in srgb, #fbbf24 16%, var(--card));
+  --risk-medium-border: color-mix(in srgb, #fbbf24 40%, var(--card));
+  --risk-medium-text: #fcd34d;
+  --risk-low: #4ade80;
+  --risk-low-surface: color-mix(in srgb, #4ade80 16%, var(--card));
+  --risk-low-border: color-mix(in srgb, #4ade80 40%, var(--card));
+  --risk-low-text: #86efac;
+
+  --chart-1: #8b83ff;
+  --chart-2: #b8b2ff;
+  --chart-3: #22d3ee;
+  --chart-4: #4ade80;
+  --chart-5: #f1b24a;
+
+  --sidebar: #122236;
+  --sidebar-foreground: #eaf0f7;
+  --sidebar-primary: #8b83ff;
+  --sidebar-primary-foreground: #0a1726;
+  --sidebar-accent: #1e2747;
+  --sidebar-accent-foreground: #c7c2ff;
+  --sidebar-border: #21364e;
+  --sidebar-ring: #8b83ff;
+}
+
+/* Map tokens to Tailwind's theme so utilities (bg-primary, text-risk-high, …) resolve */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-surface: var(--risk-high-surface);
+  --color-risk-high-border: var(--risk-high-border);
+  --color-risk-high-text: var(--risk-high-text);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-medium-surface: var(--risk-medium-surface);
+  --color-risk-medium-border: var(--risk-medium-border);
+  --color-risk-medium-text: var(--risk-medium-text);
+  --color-risk-low: var(--risk-low);
+  --color-risk-low-surface: var(--risk-low-surface);
+  --color-risk-low-border: var(--risk-low-border);
+  --color-risk-low-text: var(--risk-low-text);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Fonts wired via next/font in app/layout.tsx.
+     Body = Be Vietnam Pro (--font-sans); Headings = Space Grotesk (--font-heading). */
+  --font-sans: var(--font-be-vietnam-pro), "Be Vietnam Pro", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-heading: var(--font-space-grotesk), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-space-grotesk), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Headings use the display face (Space Grotesk) project-wide.
+     Legacy fairterms.css/landing.css set their own via --font-display (also Space Grotesk). */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+}

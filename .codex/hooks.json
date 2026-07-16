@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "log-prompt",
+            "command": "bash -lc 'root=\"$(git rev-parse --show-toplevel)\" && \"$root/scripts/_pyrun.sh\" \"$root/scripts/log_hook.py\" --tool=codex'",
+            "commandWindows": "cmd.exe /d /c \"for /f %R in ('git rev-parse --show-toplevel') do call %R\\scripts\\log_codex_hook.cmd\"",
+            "timeout": 10,
+            "statusMessage": "Logging Codex prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "log-stop",
+            "command": "bash -lc 'root=\"$(git rev-parse --show-toplevel)\" && \"$root/scripts/_pyrun.sh\" \"$root/scripts/log_hook.py\" --tool=codex'",
+            "commandWindows": "cmd.exe /d /c \"for /f %R in ('git rev-parse --show-toplevel') do call %R\\scripts\\log_codex_hook.cmd\"",
+            "timeout": 10,
+            "statusMessage": "Logging Codex stop"
+          }
+        ]
+      }
+    ]
+  }
+}

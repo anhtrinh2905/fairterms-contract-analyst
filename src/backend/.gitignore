@@ -1,0 +1,14 @@
+.venv/
+.chroma/
+.chroma_test/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Runtime logs (LOG_DIR)
+logs/
+*.log
+
+# Local source PDFs used to reconstruct app/rag/data/*.md
+raw_pdfs/

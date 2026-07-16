@@ -1,0 +1,58 @@
+# Golden-set evaluation for the legal RAG pipeline.
+#
+# Runs on PRs touching retrieval code, checklists, or the law corpus.
+# Fails when a known-bad citation resurfaces (must_not_cite) or Hit@3 drops
+# more than 5 percentage points below tests/golden/baseline_metrics.json.
+#
+# Required GitHub Secret: OPENAI_API_KEY (embeddings for ingest + retrieval,
+# corpus validation needs none).
+
+name: RAG Golden Eval
+
+on:
+  pull_request:
+    paths:
+      - "src/backend/app/rag/**"
+      - "src/backend/app/checklists/**"
+      - "src/backend/app/data/checklists/**"
+      - "src/backend/tests/golden/**"
+      - "src/backend/scripts/ingest.py"
+      - "src/backend/scripts/validate_legal_corpus.py"
+  workflow_dispatch:
+
+jobs:
+  golden-eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Validate legal corpus
+        run: uv run python scripts/validate_legal_corpus.py
+
+      - name: Ingest corpus
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: uv run python scripts/ingest.py app/rag/data
+
+      - name: Run golden evaluation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RUN_GOLDEN_EVAL: "1"
+        run: uv run pytest tests/test_retrieval_golden.py -v
+
+      - name: Upload metrics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: golden-metrics
+          path: src/backend/tests/golden/last_run_metrics.json
+          if-no-files-found: ignore

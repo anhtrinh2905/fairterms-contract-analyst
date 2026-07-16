@@ -1,0 +1,10 @@
+# Kết nối: ssh -F deploy/ssh/config fairterms
+# Public key: deploy/ssh/fairterms-deploy.pub
+
+Host fairterms
+  HostName 35.198.241.72
+  User fairterms-deploy
+  Port 22
+  IdentityFile deploy/ssh/fairterms-deploy
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new

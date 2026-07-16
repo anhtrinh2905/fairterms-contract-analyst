@@ -1,0 +1,48 @@
+# Environment
+.env
+deploy/.env.dev
+deploy/.env.main
+deploy/.env.deploy
+deploy/.env.tenten
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Generated OCR outputs
+outputs/
+ocr_response*.json
+reconstructed_contract.md
+
+# OS
+.DS_Store
+
+# AI logs — tracked structure, ignored content
+.ai-log/*.jsonl
+.ai-log/archive/*.jsonl
+
+# Frontend
+docs/
+.dev-local/
+
+# Pem 
+*.pem
+# Added by ggshield
+.cache_ggshield
+
+.cursor/
+
+# /flow run-state (generated; safe to ignore)
+MODE
+PROJECT_TYPE
+.flow/
+
+# secusense 
+secusense-reports

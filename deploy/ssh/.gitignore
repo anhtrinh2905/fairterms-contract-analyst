@@ -1,0 +1,4 @@
+# Private key — never commit
+fairterms-deploy
+*.pem
+id_*

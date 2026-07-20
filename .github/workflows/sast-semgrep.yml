@@ -1,0 +1,72 @@
+# SAST (Static Application Security Testing) với Semgrep.
+#
+# Quét TĨNH mã nguồn (backend Python + frontend Next.js/TS) để tìm lỗ hổng
+# bảo mật NGAY TRONG mã, trước khi app chạy. Chạy tự động mỗi lần push/PR.
+#
+# Output:
+#   - semgrep.sarif  -> hiển thị ở tab "Security" của GitHub (dễ đọc từng lỗi)
+#   - semgrep.json   -> dữ liệu thô (raw) để Week 1 sau này đẩy vào data lake/DB
+#
+# Không cần secret gì để chạy ruleset mặc định (miễn phí, offline được).
+
+name: SAST - Semgrep
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:   # cho phép bấm chạy tay trên tab Actions
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+
+    # Chạy TRONG container Docker chính thức của Semgrep.
+    # -> đúng yêu cầu đề bài "tool quét lỗ hổng chạy trong Docker".
+    # -> container đã cài sẵn semgrep, không cần pip install.
+    container:
+      image: semgrep/semgrep:latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run Semgrep scan
+        # --config auto : tự chọn bộ rule phù hợp theo ngôn ngữ phát hiện được
+        #   (có thể đổi thành: p/python p/javascript p/typescript p/security-audit)
+        # --sarif       : xuất định dạng SARIF cho GitHub Security tab
+        # --json        : xuất JSON thô (raw) cho data lake
+        # || true       : KHÔNG cho bước này làm fail pipeline dù tìm thấy lỗi
+        #   (Week 1 mình chỉ thu thập kết quả; sau này siết lại thì bỏ "|| true")
+        run: |
+          semgrep scan \
+            --config=auto \
+            --sarif --output=semgrep.sarif \
+            . || true
+          semgrep scan \
+            --config=auto \
+            --json --output=semgrep.json \
+            . || true
+
+      # Đẩy kết quả SARIF lên tab Security của GitHub (Code scanning alerts)
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+      # Lưu file JSON/SARIF thành "artifact" để tải về (nguồn cho data lake)
+      - name: Upload scan results (artifacts)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-results
+          path: |
+            semgrep.sarif
+            semgrep.json
+          if-no-files-found: warn
+
+    # Cần quyền này để bước upload-sarif ghi được vào Security tab
+    permissions:
+      contents: read
+      security-events: write

@@ -47,3 +47,7 @@ PROJECT_TYPE
 
 # secusense 
 secusense-reports
+
+# semgrep
+semgrep.sarif
+semgrep.json

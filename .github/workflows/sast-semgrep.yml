@@ -66,6 +66,20 @@ jobs:
             semgrep.json
           if-no-files-found: warn
 
+      # Tự nạp vào PostgreSQL (data lake) — chỉ chạy khi có secret DATABASE_URL.
+      # DB riêng trên VM (không mở port) => đổi runs-on thành self-hosted runner.
+      - name: Load findings into data lake
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL chưa đặt -> bỏ qua bước nạp DB."; exit 0
+          fi
+          pip install "psycopg[binary]"
+          python3 security/load_findings.py --tool semgrep \
+            --input semgrep.json --scan-ref "sast-${GITHUB_SHA::7}"
+
     # Cần quyền này để bước upload-sarif ghi được vào Security tab
     permissions:
       contents: read

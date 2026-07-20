@@ -1,0 +1,71 @@
+# DAST (Dynamic Application Security Testing) với OWASP ZAP.
+#
+# Khác SAST: quét app ĐANG CHẠY (như hacker tấn công từ ngoài), không đọc code.
+# Dùng ZAP baseline (thụ động + spider) — an toàn, không tấn công phá hoại.
+#
+# Mục tiêu quét: site staging đang live (dev.fairterms.xyz).
+# Output: report_json.json (artifact) -> nạp vào bảng security_findings bằng
+#         security/load_findings.py --tool zap.
+#
+# Chỉ quét site CỦA MÌNH. Không trỏ ZAP vào hệ thống không có quyền.
+
+name: DAST - OWASP ZAP
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "URL cần quét"
+        default: "https://dev.fairterms.xyz"
+  schedule:
+    - cron: "0 2 * * 1"   # 02:00 UTC thứ Hai hằng tuần
+
+permissions:
+  contents: read
+  issues: write            # ZAP action mở issue tóm tắt (đặt allow_issue_writing=false để tắt)
+  security-events: write   # để upload SARIF lên tab Security
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ github.event.inputs.target || 'https://dev.fairterms.xyz' }}
+          # -m 2 : chờ tối đa 2 phút cho passive scan
+          cmd_options: "-m 2"
+          # Week 1: chỉ THU THẬP, không cho scan làm fail pipeline
+          fail_action: false
+          # Không tự mở GitHub issue cho đỡ nhiễu (bật lại nếu muốn)
+          allow_issue_writing: false
+          artifact_name: zap-results
+
+      # ZAP không xuất SARIF sẵn -> tự convert rồi đẩy lên tab Security.
+      - name: Convert ZAP JSON -> SARIF
+        if: always()
+        run: python3 security/zap_to_sarif.py --input report_json.json --output zap.sarif
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: zap.sarif
+          category: zap-dast   # tách riêng với Semgrep trên cùng repo
+
+      # Tự nạp vào PostgreSQL (data lake) — chỉ chạy khi có secret DATABASE_URL.
+      # DB riêng trên VM (không mở port) => đổi runs-on thành self-hosted runner.
+      - name: Load findings into data lake
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL chưa đặt -> bỏ qua bước nạp DB."; exit 0
+          fi
+          pip install "psycopg[binary]"
+          python3 security/load_findings.py --tool zap \
+            --input report_json.json --scan-ref "dast-${GITHUB_SHA::7}"

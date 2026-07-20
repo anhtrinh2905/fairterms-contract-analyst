@@ -51,3 +51,7 @@ secusense-reports
 # semgrep
 semgrep.sarif
 semgrep.json
+
+# zap
+zap.json
+zap.yaml

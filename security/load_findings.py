@@ -102,7 +102,50 @@ def parse_semgrep(data: dict, scan_ref: str) -> list[dict]:
     return rows
 
 
-PARSERS = {"semgrep": parse_semgrep}
+# Map riskcode của ZAP sang thang chung.
+ZAP_RISK_MAP = {"3": "HIGH", "2": "MEDIUM", "1": "LOW", "0": "INFO"}
+
+
+def parse_zap(data: dict, scan_ref: str) -> list[dict]:
+    """Chuyển ZAP baseline JSON -> list bản ghi. 1 dòng / mỗi URL bị dính lỗi.
+
+    Cấu trúc ZAP: data['site'][*]['alerts'][*]['instances'][*].
+    DAST định vị lỗi theo URL (không phải dòng code) -> dùng cột file_path
+    để lưu URL, start_line/end_line để trống.
+    """
+    rows: list[dict] = []
+    for site in data.get("site", []):
+        for alert in site.get("alerts", []):
+            plugin_id = alert.get("pluginid")
+            name = alert.get("alert") or alert.get("name")
+            severity = ZAP_RISK_MAP.get(str(alert.get("riskcode")), None)
+            # 1 alert có thể dính nhiều URL -> tách từng instance thành 1 dòng.
+            instances = alert.get("instances") or [{}]
+            for inst in instances:
+                uri = inst.get("uri") or site.get("@name")
+                param = inst.get("param", "")
+                method = inst.get("method", "")
+                fp_seed = "|".join(str(x) for x in
+                                   ("zap", plugin_id, uri, method, param))
+                fp = "zap:" + hashlib.sha256(fp_seed.encode()).hexdigest()[:16]
+                rows.append({
+                    "tool": "zap",
+                    "rule_id": plugin_id,
+                    "severity": severity,
+                    "title": name,
+                    "message": (alert.get("desc") or "").strip(),
+                    "file_path": uri,          # với DAST: URL thay cho file
+                    "start_line": None,
+                    "end_line": None,
+                    "scan_ref": scan_ref,
+                    "fingerprint": fp,
+                    "raw": json.dumps({**alert, "_instance": inst},
+                                      ensure_ascii=False),
+                })
+    return rows
+
+
+PARSERS = {"semgrep": parse_semgrep, "zap": parse_zap}
 
 
 def main() -> int:

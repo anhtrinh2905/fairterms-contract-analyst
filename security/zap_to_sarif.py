@@ -26,10 +26,21 @@ RISK_MAP = {
 }
 
 _TAGS = re.compile(r"<[^>]+>")
+_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
 
 def strip_html(text: str) -> str:
     return _TAGS.sub("", text or "").strip()
+
+
+def to_relative_uri(url: str) -> str:
+    """GitHub code scanning bắt uri phải TƯƠNG ĐỐI (không có scheme http/https).
+
+    DAST định vị theo URL nên bỏ scheme, đặt dưới prefix 'zap/' để nhìn biết
+    ngay là kết quả DAST, không nhầm với file code thật trong repo.
+    """
+    path = _SCHEME.sub("", url or "unknown").strip("/") or "root"
+    return f"zap/{path}"
 
 
 def convert(data: dict) -> dict:
@@ -55,15 +66,18 @@ def convert(data: dict) -> dict:
 
             # mỗi URL dính lỗi -> 1 result
             for inst in (alert.get("instances") or [{}]):
-                uri = inst.get("uri") or site.get("@name") or "unknown"
-                msg = f"{name}: {strip_html(alert.get('desc'))[:300]}"
+                url = inst.get("uri") or site.get("@name") or "unknown"
+                method = inst.get("method", "")
+                # giữ URL đầy đủ trong message (uri location phải tương đối)
+                msg = (f"[{method} {url}] {name}: "
+                       f"{strip_html(alert.get('desc'))[:300]}")
                 results.append({
                     "ruleId": plugin_id,
                     "level": level,
                     "message": {"text": msg},
                     "locations": [{
                         "physicalLocation": {
-                            "artifactLocation": {"uri": uri},
+                            "artifactLocation": {"uri": to_relative_uri(url)},
                             "region": {"startLine": 1},
                         }
                     }],

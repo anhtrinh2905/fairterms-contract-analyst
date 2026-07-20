@@ -13,7 +13,7 @@ from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
 
-API_HOSTS = ("api-dev.c2-app-145.io.vn", "api.c2-app-145.io.vn")
+API_HOSTS = ("api-dev.fairterms.xyz", "api.fairterms.xyz")
 LIMITS = (
     "    client_max_body_size 55m;",
     "        proxy_read_timeout 600s;",

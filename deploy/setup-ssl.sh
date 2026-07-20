@@ -3,7 +3,7 @@
 # Prerequisites: DNS A records must point to this server; ports 80/443 open in the AWS security group.
 set -euo pipefail
 
-DOMAIN="c2-app-145.io.vn"
+DOMAIN="fairterms.xyz"
 
 certbot --nginx \
   -d "dev.${DOMAIN}" \

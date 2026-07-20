@@ -1,37 +1,42 @@
-# DNS setup for c2-app-145.io.vn
+# DNS setup for fairterms.xyz
 
-Server: **AWS EC2** (ap-southeast-1), Elastic IP **`52.77.14.171`**.
-Domain dùng nameserver **Tenten** — chỉ cần thêm/sửa A records trỏ về Elastic IP.
+Domain đăng ký tại **Namecheap**. Server: **AWS EC2** (ap-southeast-1), Elastic IP **`52.77.14.171`**.
 
-## Thêm A records tại Tenten (khuyến nghị cho MVP)
+Dùng **Namecheap BasicDNS** (mặc định) — chỉ cần thêm A records trỏ về Elastic IP.
+Không cần đổi nameserver.
 
-Đăng nhập [domain.tenten.vn](https://domain.tenten.vn) → chọn `c2-app-145.io.vn` →
-quản lý DNS → thêm/sửa các bản ghi **A** → `52.77.14.171`:
+## Thêm A records tại Namecheap
 
-| Host | Type | Value |
-|------|------|-------|
-| `@` | A | 52.77.14.171 |
-| `www` | A | 52.77.14.171 |
-| `dev` | A | 52.77.14.171 |
-| `api-dev` | A | 52.77.14.171 |
-| `api` | A | 52.77.14.171 |
+Đăng nhập [namecheap.com](https://www.namecheap.com) → **Domain List** → `fairterms.xyz`
+→ **Manage** → tab **Advanced DNS** → mục **Host Records** → **Add New Record**
+(chọn Type = A Record). Cột **Host** dùng label (KHÔNG ghi domain đầy đủ):
 
-> Nếu trước đây đã đổi NS sang Google Cloud DNS, đổi lại về NS Tenten (hoặc cập
-> nhật A records trong Cloud DNS sang `52.77.14.171`). Để dứt điểm khỏi GCP, nên
-> dùng thẳng A records tại Tenten như trên.
+| Host | Type | Value | TTL |
+|------|------|-------|-----|
+| `@` | A Record | 52.77.14.171 | Automatic |
+| `www` | A Record | 52.77.14.171 | Automatic |
+| `dev` | A Record | 52.77.14.171 | Automatic |
+| `api-dev` | A Record | 52.77.14.171 | Automatic |
+| `api` | A Record | 52.77.14.171 | Automatic |
 
-## Kiểm tra sau 15–60 phút
+> - `@` = apex (`fairterms.xyz`), phục vụ frontend main.
+> - Xoá record mẫu Namecheap tự thêm (CNAME `www` → parkingpage, hoặc URL Redirect)
+>   nếu có — nó chặn A record.
+> - **Gắn Elastic IP** cho EC2 để IP không đổi khi reboot; nếu chưa, phải sửa lại
+>   toàn bộ A records mỗi lần IP đổi.
+
+## Kiểm tra sau 5–30 phút (Namecheap propagate nhanh)
 
 ```bash
-nslookup c2-app-145.io.vn        # -> 52.77.14.171
-nslookup dev.c2-app-145.io.vn
-nslookup api-dev.c2-app-145.io.vn
-nslookup api.c2-app-145.io.vn
+dig +short fairterms.xyz            # -> 52.77.14.171
+dig +short dev.fairterms.xyz
+dig +short api-dev.fairterms.xyz
+dig +short api.fairterms.xyz
 ```
 
 ## Cài SSL sau khi DNS propagate
 
 ```bash
 ssh -F deploy/ssh/config fairterms
-sudo bash ~/fairterms/deploy/setup-ssl.sh
+sudo bash ~/fairterms/deploy/setup-ssl.sh   # certbot cho cả 5 tên miền
 ```

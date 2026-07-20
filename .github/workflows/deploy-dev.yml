@@ -1,6 +1,6 @@
 # Push to dev → build *-dev images → push GHCR → deploy on VM
 #
-# Domain: c2-app-145.io.vn
+# Domain: fairterms.xyz
 # Required GitHub Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, DEV_ENV_FILE
 
 name: Deploy Dev
@@ -11,12 +11,12 @@ on:
   workflow_dispatch:
 
 env:
-  DOMAIN: c2-app-145.io.vn
+  DOMAIN: fairterms.xyz
   DEPLOY_DIR: ~/fairterms/deploy
   COMPOSE_FILE: docker-compose.dev.yml
   BACKEND_TAG: backend-dev
   FRONTEND_TAG: frontend-dev
-  NEXT_PUBLIC_BACKEND_URL: https://api-dev.c2-app-145.io.vn
+  NEXT_PUBLIC_BACKEND_URL: https://api-dev.fairterms.xyz
   HEALTH_BACKEND_PORT: 8000
   HEALTH_FRONTEND_PORT: 3000
 

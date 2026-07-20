@@ -1,15 +1,15 @@
 # Deploy — FairTerms CI/CD
 
-Domain: **c2-app-145.io.vn** · Server (AWS EC2, ap-southeast-1): `52.77.14.171`
+Domain: **fairterms.xyz** (Namecheap) · Server (AWS EC2, ap-southeast-1): `52.77.14.171`
 
 ## Subdomains
 
 | Host | Stack | Container port |
 |------|-------|----------------|
-| `dev.c2-app-145.io.vn` | frontend dev | 3000 |
-| `api-dev.c2-app-145.io.vn` | backend dev | 8000 |
-| `c2-app-145.io.vn` | frontend main | 3001 |
-| `api.c2-app-145.io.vn` | backend main | 8001 |
+| `dev.fairterms.xyz` | frontend dev | 3000 |
+| `api-dev.fairterms.xyz` | backend dev | 8000 |
+| `fairterms.xyz` | frontend main | 3001 |
+| `api.fairterms.xyz` | backend main | 8001 |
 
 ## PostgreSQL (self-hosted, one container on the VM)
 
@@ -58,8 +58,8 @@ host reverse-proxy qua 443, các stack truy cập nội bộ qua Docker network.
 
 ## DNS
 
-Xem **[DNS.md](./DNS.md)** — Cloud DNS zone `fairterms-zone` đã có đủ A records.  
-Cần **đổi NS tại Tenten** sang Google nameservers (hoặc thêm A records thủ công tại Tenten).
+Xem **[DNS.md](./DNS.md)** — thêm A records tại **Namecheap** (Advanced DNS) trỏ 5 host
+(`@`, `www`, `dev`, `api-dev`, `api`) về Elastic IP EC2. Dùng BasicDNS, không cần đổi nameserver.
 
 ## GitHub Secrets
 
